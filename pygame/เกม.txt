@@ -1,0 +1,200 @@
+import pygame
+import random
+
+# ค่าพื้นฐาน
+WIDTH, HEIGHT = 800, 600
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+BLUE = (0, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+
+# เริ่มต้น Pygame
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Shooting Game")
+clock = pygame.time.Clock()
+
+# โหลดเสียง
+shoot_sound = pygame.mixer.Sound("shoot.wav")
+
+def start_game():
+    global player_x, player_y, player_hp, score, bullets, enemies, running, paused, bullet_speed, bullet_count, in_shop
+    player_x = WIDTH // 2
+    player_y = HEIGHT - 80
+    player_hp = 3
+    score = 0
+    bullets = []
+    enemies = []
+    bullet_speed = 7
+    bullet_count = 1
+    running = True
+    paused = False
+    in_shop = False
+
+def spawn_enemy():
+    enemies.append(pygame.Rect(random.randint(0, WIDTH - 50), 0, 50, 50))
+
+def update_bullets():
+    global bullets, enemies, score
+    for bullet in bullets[:]:
+        bullet.y -= bullet_speed
+        if bullet.y < 0:
+            bullets.remove(bullet)
+        for enemy in enemies[:]:
+            if bullet.colliderect(enemy):
+                enemies.remove(enemy)
+                bullets.remove(bullet)
+                score += 1
+
+def update_enemies():
+    global player_hp, running
+    for enemy in enemies[:]:
+        enemy.y += 3
+        if enemy.y > HEIGHT:
+            enemies.remove(enemy)
+        if enemy.colliderect(pygame.Rect(player_x, player_y, 50, 50)):
+            player_hp -= 1
+            enemies.remove(enemy)
+            if player_hp <= 0:
+                running = False
+                game_over_screen()
+
+def draw_button(text, x, y, width, height, color, hover_color):
+    mouse = pygame.mouse.get_pos()
+    click = pygame.mouse.get_pressed()
+    
+    if x < mouse[0] < x + width and y < mouse[1] < y + height:
+        pygame.draw.rect(screen, hover_color, (x, y, width, height))
+        if click[0] == 1:
+            return True
+    else:
+        pygame.draw.rect(screen, color, (x, y, width, height))
+
+    font = pygame.font.Font(None, 40)
+    text_surf = font.render(text, True, BLACK)
+    text_rect = text_surf.get_rect(center=(x + width // 2, y + height // 2))
+    screen.blit(text_surf, text_rect)
+    
+    return False
+
+def game_over_screen():
+    global running
+    while True:
+        screen.fill(GRAY)
+        font = pygame.font.Font(None, 50)
+        screen.blit(font.render("GAME OVER", True, RED), (WIDTH // 2 - 100, 50))
+        new_game_btn = draw_button("New Game", WIDTH // 2 - 100, 200, 200, 50, WHITE, (200, 200, 200))
+        exit_btn = draw_button("Exit", WIDTH // 2 - 100, 300, 200, 50, WHITE, (200, 200, 200))
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+        
+        if new_game_btn:
+            start_game()
+            return
+        if exit_btn:
+            pygame.quit()
+            exit()
+
+def shop_screen():
+    global in_shop, score, bullet_speed, bullet_count
+    while in_shop:
+        screen.fill(GRAY)
+        font = pygame.font.Font(None, 50)
+        screen.blit(font.render("Shop", True, BLACK), (WIDTH // 2 - 50, 50))
+        upgrade_bullet_btn = draw_button("Upgrade Bullet (10 kills)", WIDTH // 2 - 150, 150, 300, 50, WHITE, (200, 200, 200))
+        upgrade_speed_btn = draw_button("Increase Speed (15 kills)", WIDTH // 2 - 150, 220, 300, 50, WHITE, (200, 200, 200))
+        exit_btn = draw_button("Exit Shop", WIDTH // 2 - 100, 300, 200, 50, WHITE, (200, 200, 200))
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+        
+        if upgrade_bullet_btn and score >= 10:
+            score -= 10
+            bullet_count += 1
+        if upgrade_speed_btn and score >= 15:
+            score -= 15
+            bullet_speed += 2
+        if exit_btn:
+            in_shop = False
+            return
+
+def pause_screen():
+    global paused, in_shop
+    while paused:
+        screen.fill(GRAY)
+        font = pygame.font.Font(None, 50)
+        screen.blit(font.render("Paused", True, BLACK), (WIDTH // 2 - 50, 50))
+        resume_btn = draw_button("Resume", WIDTH // 2 - 100, 200, 200, 50, WHITE, (200, 200, 200))
+        shop_btn = draw_button("Shop", WIDTH // 2 - 100, 270, 200, 50, WHITE, (200, 200, 200))
+        exit_btn = draw_button("Exit", WIDTH // 2 - 100, 340, 200, 50, WHITE, (200, 200, 200))
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+        
+        if resume_btn:
+            paused = False
+        if shop_btn:
+            in_shop = True
+            shop_screen()
+        if exit_btn:
+            pygame.quit()
+            exit()
+
+start_game()
+spawn_timer = 0
+
+while True:
+    while running:
+        screen.fill(WHITE)
+        font = pygame.font.Font(None, 36)
+        screen.blit(font.render(f"Kill Points: {score}", True, BLUE), (10, 10))
+        screen.blit(font.render(f"HP: {player_hp}", True, RED), (WIDTH - 100, 10))
+        
+        player = pygame.Rect(player_x, player_y, 50, 50)
+        pygame.draw.rect(screen, GREEN, player)
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_a] and player_x > 0:
+            player_x -= 7
+        if keys[pygame.K_d] and player_x < WIDTH - 50:
+            player_x += 7
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    paused = True
+                    pause_screen()
+                if event.key == pygame.K_SPACE:
+                    for i in range(bullet_count):
+                        bullets.append(pygame.Rect(player_x + 20 + (i * 15), player_y, 10, 20))
+                    shoot_sound.play()
+        
+        if spawn_timer % 60 == 0:
+            spawn_enemy()
+        spawn_timer += 1
+
+        update_bullets()
+        update_enemies()
+        
+        for bullet in bullets:
+            pygame.draw.rect(screen, BLACK, bullet)
+        for enemy in enemies:
+            pygame.draw.rect(screen, RED, enemy)
+        
+        pygame.display.flip()
+        clock.tick(60)
